@@ -1,7 +1,6 @@
-version: '3.8'
-
 services:
   bot:
+    image: "${BOT_IMAGE:-polymarket-btc-bot-bot:local}"
     build:
       context: .
       dockerfile: Dockerfile
@@ -16,6 +15,7 @@ services:
       - bot-network
 
   dashboard:
+    image: "${DASHBOARD_IMAGE:-polymarket-btc-bot-dashboard:local}"
     build:
       context: ./dashboard
       dockerfile: Dockerfile

@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+dashboard/node_modules
+dashboard/.next
+dist
+data
+coverage
+*.log
+app.tar.gz
+README.md
+tests
+fixtures
+vitest.config.ts

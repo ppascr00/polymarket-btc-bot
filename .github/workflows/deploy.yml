@@ -10,24 +10,55 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            dashboard/package-lock.json
-
-      - name: Validate bot build
+      - name: Set image metadata
+        id: meta
         run: |
-          npm ci
-          npm run build
+          owner_lc="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "owner_lc=$owner_lc" >> "$GITHUB_OUTPUT"
+          echo "bot_image=ghcr.io/$owner_lc/polymarket-btc-bot-bot" >> "$GITHUB_OUTPUT"
+          echo "dashboard_image=ghcr.io/$owner_lc/polymarket-btc-bot-dashboard" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push bot image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.bot_image }}:${{ github.sha }}
+            ${{ steps.meta.outputs.bot_image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push dashboard image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dashboard
+          file: ./dashboard/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.dashboard_image }}:${{ github.sha }}
+            ${{ steps.meta.outputs.dashboard_image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Pack project
         run: |
@@ -80,8 +111,15 @@ jobs:
               COMPOSE_CMD="docker compose"
             fi
 
+            # Optional GHCR login for private package pulls.
+            if [ -n "${{ secrets.GHCR_USERNAME }}" ] && [ -n "${{ secrets.GHCR_TOKEN }}" ]; then
+              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+            fi
+
             # Use a stable project name to keep resource cleanup scoped.
             export COMPOSE_PROJECT_NAME="polymarket-btc-bot"
+            export BOT_IMAGE="${{ steps.meta.outputs.bot_image }}:${{ github.sha }}"
+            export DASHBOARD_IMAGE="${{ steps.meta.outputs.dashboard_image }}:${{ github.sha }}"
 
             cleanup() {
               # Always run, even if deploy fails.
@@ -91,10 +129,9 @@ jobs:
             }
             trap cleanup EXIT
 
-            # Pre-cleanup: stop/remove old containers from this compose project.
-            $COMPOSE_CMD down --remove-orphans || true
-
-            $COMPOSE_CMD up -d --build --remove-orphans
+            # Pull built images from registry and roll containers without rebuilding in VM.
+            $COMPOSE_CMD pull bot dashboard
+            $COMPOSE_CMD up -d --remove-orphans
             $COMPOSE_CMD ps
 
       - name: Cleanup VM (always)
