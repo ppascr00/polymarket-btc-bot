@@ -1,0 +1,137 @@
+[
+    {
+        "timestamp": 1700000000000,
+        "open": 43000.0,
+        "high": 43050.0,
+        "low": 42980.0,
+        "close": 43020.0,
+        "volume": 125.5,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000060000,
+        "open": 43020.0,
+        "high": 43080.0,
+        "low": 43010.0,
+        "close": 43060.0,
+        "volume": 98.3,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000120000,
+        "open": 43060.0,
+        "high": 43100.0,
+        "low": 43040.0,
+        "close": 43090.0,
+        "volume": 112.7,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000180000,
+        "open": 43090.0,
+        "high": 43120.0,
+        "low": 43070.0,
+        "close": 43110.0,
+        "volume": 87.1,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000240000,
+        "open": 43110.0,
+        "high": 43150.0,
+        "low": 43100.0,
+        "close": 43140.0,
+        "volume": 145.2,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000300000,
+        "open": 43140.0,
+        "high": 43160.0,
+        "low": 43100.0,
+        "close": 43120.0,
+        "volume": 133.8,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000360000,
+        "open": 43120.0,
+        "high": 43130.0,
+        "low": 43050.0,
+        "close": 43060.0,
+        "volume": 156.4,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000420000,
+        "open": 43060.0,
+        "high": 43080.0,
+        "low": 43020.0,
+        "close": 43040.0,
+        "volume": 178.9,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000480000,
+        "open": 43040.0,
+        "high": 43070.0,
+        "low": 43000.0,
+        "close": 43010.0,
+        "volume": 142.3,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000540000,
+        "open": 43010.0,
+        "high": 43050.0,
+        "low": 42990.0,
+        "close": 43030.0,
+        "volume": 119.6,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000600000,
+        "open": 43030.0,
+        "high": 43090.0,
+        "low": 43020.0,
+        "close": 43080.0,
+        "volume": 167.2,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000660000,
+        "open": 43080.0,
+        "high": 43120.0,
+        "low": 43060.0,
+        "close": 43100.0,
+        "volume": 134.5,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000720000,
+        "open": 43100.0,
+        "high": 43140.0,
+        "low": 43080.0,
+        "close": 43130.0,
+        "volume": 109.8,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000780000,
+        "open": 43130.0,
+        "high": 43170.0,
+        "low": 43120.0,
+        "close": 43160.0,
+        "volume": 128.4,
+        "source": "binance"
+    },
+    {
+        "timestamp": 1700000840000,
+        "open": 43160.0,
+        "high": 43200.0,
+        "low": 43150.0,
+        "close": 43190.0,
+        "volume": 151.7,
+        "source": "binance"
+    }
+]

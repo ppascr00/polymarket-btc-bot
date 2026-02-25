@@ -1,0 +1,75 @@
+name: Deploy to GCE VM
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pack project
+        run: |
+          tar \
+            --exclude=".git" \
+            --exclude=".github" \
+            --exclude="node_modules" \
+            --exclude="dashboard/node_modules" \
+            --exclude="dashboard/.next" \
+            --exclude="data" \
+            -czf app.tar.gz .
+
+      - name: Upload package to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: app.tar.gz
+          target: /tmp
+
+      - name: Deploy on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            APP_DIR="${{ secrets.APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then
+              echo "APP_DIR secret is empty"
+              exit 1
+            fi
+
+            mkdir -p "$APP_DIR"
+            tar -xzf /tmp/app.tar.gz -C "$APP_DIR"
+            rm -f /tmp/app.tar.gz
+
+            # Optional: manage .env from GitHub secret.
+            # If APP_ENV is not set, keep existing file on server.
+            if [ -n "${{ secrets.APP_ENV }}" ]; then
+              printf '%s\n' "${{ secrets.APP_ENV }}" > "$APP_DIR/.env"
+            fi
+
+            cd "$APP_DIR"
+
+            if command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE_CMD="docker-compose"
+            else
+              COMPOSE_CMD="docker compose"
+            fi
+
+            $COMPOSE_CMD up -d --build --remove-orphans
+            $COMPOSE_CMD ps

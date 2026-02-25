@@ -1,0 +1,26 @@
+{
+    "condition_id": "0x1234567890abcdef1234567890abcdef12345678",
+    "question": "Will the price of Bitcoin be higher in 5 minutes?",
+    "description": "This market resolves to 'Yes' if the price of Bitcoin (BTC/USD) is strictly higher at the end of the 5-minute window compared to the start. Measured using Chainlink oracle.",
+    "market_slug": "bitcoin-5min-up-or-down",
+    "tokens": [
+        {
+            "token_id": "71234567890123456789012345678901234567890123456789012345678901234567",
+            "outcome": "Yes"
+        },
+        {
+            "token_id": "89012345678901234567890123456789012345678901234567890123456789012345",
+            "outcome": "No"
+        }
+    ],
+    "active": true,
+    "closed": false,
+    "end_date_iso": "2025-12-31T23:59:59Z",
+    "category": "crypto",
+    "tags": [
+        "bitcoin",
+        "btc",
+        "5min",
+        "up-down"
+    ]
+}
