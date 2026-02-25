@@ -22,10 +22,11 @@ services:
     env_file: .env
     environment:
       - DB_PATH=/app/data/bot.db
+      - BOT_PROCESS_MANAGER=docker
     ports:
       - "${DASHBOARD_PORT:-3000}:3000"
     volumes:
-      - ./data:/app/data:ro
+      - ./data:/app/data
     restart: unless-stopped
     networks:
       - bot-network

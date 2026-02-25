@@ -8,8 +8,26 @@ interface BotPidInfo {
     startedAt: number;
 }
 
+type ProcessManagerMode = 'local' | 'docker';
+
 function getRepoRoot(): string {
     return path.resolve(process.cwd(), '..');
+}
+
+function getProcessManagerMode(): ProcessManagerMode {
+    const configured = (process.env.BOT_PROCESS_MANAGER || '').trim().toLowerCase();
+    if (configured === 'docker') return 'docker';
+    if (configured === 'local') return 'local';
+
+    if (fs.existsSync('/.dockerenv')) {
+        return 'docker';
+    }
+
+    return 'local';
+}
+
+export function isDockerProcessManager(): boolean {
+    return getProcessManagerMode() === 'docker';
 }
 
 function getPidFilePath(): string {
@@ -17,10 +35,14 @@ function getPidFilePath(): string {
 }
 
 function getDbPath(): string {
-    const repoRoot = getRepoRoot();
     const configured = process.env.DB_PATH || './data/bot.db';
     if (path.isAbsolute(configured)) return configured;
-    return path.resolve(repoRoot, configured);
+
+    if (isDockerProcessManager()) {
+        return path.resolve(process.cwd(), configured);
+    }
+
+    return path.resolve(getRepoRoot(), configured);
 }
 
 function getActiveMode(): 'PAPER' | 'LIVE' {
@@ -83,7 +105,67 @@ function isPidRunning(pid: number): boolean {
     }
 }
 
+function setPausedState(paused: boolean): boolean {
+    const dbPath = getDbPath();
+
+    try {
+        const db = new Database(dbPath);
+        db.prepare(
+            `INSERT OR REPLACE INTO system_state (key, value, updated_at)
+             VALUES ('paused', ?, ?)`
+        ).run(String(paused), Date.now());
+        db.close();
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function getRuntimeState(): {
+    dbOk: boolean;
+    heartbeatFresh: boolean;
+    paused: boolean;
+} {
+    const dbPath = getDbPath();
+    if (!fs.existsSync(dbPath)) {
+        return { dbOk: false, heartbeatFresh: false, paused: false };
+    }
+
+    try {
+        const db = new Database(dbPath, { readonly: true });
+
+        const heartbeatRow = db
+            .prepare('SELECT value FROM system_state WHERE key = ?')
+            .get('last_heartbeat') as { value?: string } | undefined;
+
+        const pausedRow = db
+            .prepare('SELECT value FROM system_state WHERE key = ?')
+            .get('paused') as { value?: string } | undefined;
+
+        db.close();
+
+        const lastHeartbeat = Number.parseInt(heartbeatRow?.value || '0', 10);
+        const heartbeatFresh = Number.isFinite(lastHeartbeat)
+            && lastHeartbeat > 0
+            && (Date.now() - lastHeartbeat) < 90_000;
+
+        return {
+            dbOk: true,
+            heartbeatFresh,
+            paused: pausedRow?.value === 'true',
+        };
+    } catch {
+        return { dbOk: false, heartbeatFresh: false, paused: false };
+    }
+}
+
 export function getBotProcessStatus(): { running: boolean; pid: number | null } {
+    if (isDockerProcessManager()) {
+        const runtime = getRuntimeState();
+        // In Docker mode, "running" means active (heartbeat fresh and not paused).
+        return { running: runtime.dbOk && runtime.heartbeatFresh && !runtime.paused, pid: null };
+    }
+
     const info = readPidInfo();
     if (!info) return { running: false, pid: null };
 
@@ -97,6 +179,39 @@ export function getBotProcessStatus(): { running: boolean; pid: number | null } 
 }
 
 export function startBotProcess(): { started: boolean; pid: number | null; message: string } {
+    if (isDockerProcessManager()) {
+        const runtime = getRuntimeState();
+        if (!runtime.dbOk) {
+            return {
+                started: false,
+                pid: null,
+                message: 'DB unavailable. Ensure dashboard has write access to /app/data.',
+            };
+        }
+
+        if (!runtime.paused && runtime.heartbeatFresh) {
+            return { started: false, pid: null, message: 'Bot is already running' };
+        }
+
+        if (!setPausedState(false)) {
+            return {
+                started: false,
+                pid: null,
+                message: 'Failed to update paused state in DB.',
+            };
+        }
+
+        if (!runtime.heartbeatFresh) {
+            return {
+                started: false,
+                pid: null,
+                message: 'Bot service heartbeat is missing. Start bot container with: docker compose up -d bot',
+            };
+        }
+
+        return { started: true, pid: null, message: 'Bot resumed' };
+    }
+
     const current = getBotProcessStatus();
     if (current.running) {
         return { started: false, pid: current.pid, message: 'Bot is already running' };
@@ -136,6 +251,27 @@ export function startBotProcess(): { started: boolean; pid: number | null; messa
 }
 
 export async function stopBotProcess(): Promise<{ stopped: boolean; message: string }> {
+    if (isDockerProcessManager()) {
+        const runtime = getRuntimeState();
+        if (!runtime.dbOk) {
+            return { stopped: false, message: 'DB unavailable. Ensure dashboard can access /app/data/bot.db.' };
+        }
+
+        if (runtime.paused) {
+            return { stopped: false, message: 'Bot is already stopped' };
+        }
+
+        if (!setPausedState(true)) {
+            return { stopped: false, message: 'Failed to update paused state in DB.' };
+        }
+
+        if (!runtime.heartbeatFresh) {
+            return { stopped: true, message: 'Bot marked as stopped, but heartbeat is currently missing.' };
+        }
+
+        return { stopped: true, message: 'Bot paused' };
+    }
+
     const current = getBotProcessStatus();
     if (!current.running || !current.pid) {
         clearPidInfo();

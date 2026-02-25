@@ -203,14 +203,15 @@ export default function DashboardPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paused: nextPaused }),
             });
+            const payload = await res.json().catch(() => ({}));
 
             if (!res.ok) {
-                throw new Error('Control request failed');
+                throw new Error(payload?.error || 'Control request failed');
             }
 
             await fetchData();
-        } catch {
-            setError('Failed to toggle bot state');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to toggle bot state');
         } finally {
             setIsTogglingBot(false);
         }
@@ -227,14 +228,15 @@ export default function DashboardPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action }),
             });
+            const payload = await res.json().catch(() => ({}));
 
-            if (!res.ok && res.status !== 409) {
-                throw new Error('Process control request failed');
+            if (!res.ok) {
+                throw new Error(payload?.message || payload?.error || 'Process control request failed');
             }
 
             await fetchData();
-        } catch {
-            setError('Failed to start/stop bot process');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to start/stop bot process');
         } finally {
             setIsTogglingProcess(false);
         }
