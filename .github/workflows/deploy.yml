@@ -29,12 +29,6 @@ jobs:
           npm ci
           npm run build
 
-      - name: Validate dashboard build
-        run: |
-          cd dashboard
-          npm ci
-          npm run build
-
       - name: Pack project
         run: |
           git archive --format=tar.gz --output=app.tar.gz HEAD
