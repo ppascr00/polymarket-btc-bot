@@ -15,18 +15,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
+
+      - name: Validate bot build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Validate dashboard build
+        run: |
+          cd dashboard
+          npm ci
+          npm run build
+
       - name: Pack project
         run: |
-          TAR_PATH="/tmp/app.tar.gz"
-          tar \
-            --exclude=".git" \
-            --exclude=".github" \
-            --exclude="node_modules" \
-            --exclude="dashboard/node_modules" \
-            --exclude="dashboard/.next" \
-            --exclude="data" \
-            -czf "$TAR_PATH" .
-          mv "$TAR_PATH" app.tar.gz
+          git archive --format=tar.gz --output=app.tar.gz HEAD
 
       - name: Upload package to VM
         uses: appleboy/scp-action@v0.1.7
