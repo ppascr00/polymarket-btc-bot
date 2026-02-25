@@ -9,7 +9,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -50,6 +50,8 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 30m
+          command_timeout: 80m
           script_stop: true
           script: |
             set -euo pipefail
