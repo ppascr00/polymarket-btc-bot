@@ -9,7 +9,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -50,6 +50,8 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 30m
+          command_timeout: 80m
           script_stop: true
           script: |
             set -euo pipefail
@@ -78,5 +80,36 @@ jobs:
               COMPOSE_CMD="docker compose"
             fi
 
+            # Use a stable project name to keep resource cleanup scoped.
+            export COMPOSE_PROJECT_NAME="polymarket-btc-bot"
+
+            cleanup() {
+              # Always run, even if deploy fails.
+              docker container prune -f || true
+              docker image prune -f || true
+              docker builder prune -f || true
+            }
+            trap cleanup EXIT
+
+            # Pre-cleanup: stop/remove old containers from this compose project.
+            $COMPOSE_CMD down --remove-orphans || true
+
             $COMPOSE_CMD up -d --build --remove-orphans
             $COMPOSE_CMD ps
+
+      - name: Cleanup VM (always)
+        if: ${{ always() }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 15m
+          command_timeout: 15m
+          script_stop: false
+          script: |
+            set +e
+            docker container prune -f || true
+            docker image prune -f || true
+            docker builder prune -f || true
