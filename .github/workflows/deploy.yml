@@ -17,6 +17,7 @@ jobs:
 
       - name: Pack project
         run: |
+          TAR_PATH="/tmp/app.tar.gz"
           tar \
             --exclude=".git" \
             --exclude=".github" \
@@ -24,7 +25,8 @@ jobs:
             --exclude="dashboard/node_modules" \
             --exclude="dashboard/.next" \
             --exclude="data" \
-            -czf app.tar.gz .
+            -czf "$TAR_PATH" .
+          mv "$TAR_PATH" app.tar.gz
 
       - name: Upload package to VM
         uses: appleboy/scp-action@v0.1.7
