@@ -55,7 +55,7 @@ export default function StrategyWindowsPage() {
     const fetchRows = useCallback(async (nextOffset: number) => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/strategy-windows?limit=${PAGE_SIZE}&offset=${nextOffset}`);
+            const res = await fetch(`/api/strategy-windows?limit=${PAGE_SIZE}&offset=${nextOffset}`, { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch window matrix');
             const data = await res.json() as ApiResponse;
             setMode(data.mode ?? 'PAPER');
@@ -200,4 +200,3 @@ export default function StrategyWindowsPage() {
         </div>
     );
 }
-

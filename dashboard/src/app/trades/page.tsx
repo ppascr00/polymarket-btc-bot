@@ -30,7 +30,7 @@ export default function AllTradesPage() {
     const fetchTrades = useCallback(async (nextOffset: number) => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/trades?limit=${PAGE_SIZE}&offset=${nextOffset}`);
+            const res = await fetch(`/api/trades?limit=${PAGE_SIZE}&offset=${nextOffset}`, { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch trades');
 
             const data = await res.json() as { trades: Trade[]; total: number; offset: number };

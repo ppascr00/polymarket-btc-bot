@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import Database from 'better-sqlite3';
 import path from 'path';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const DB_PATH = process.env.DB_PATH || path.resolve('..', 'data', 'bot.db');
 const AVAILABLE_STRATEGIES = [
     'probabilistic',

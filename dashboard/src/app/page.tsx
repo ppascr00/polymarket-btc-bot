@@ -146,10 +146,10 @@ export default function DashboardPage() {
     const fetchData = useCallback(async () => {
         try {
             const [statusRes, tradesRes, strategyStatsRes, strategyWindowsRes] = await Promise.all([
-                fetch('/api/status'),
-                fetch('/api/trades'),
-                fetch(`/api/strategy-stats?window=${strategyWindow}&minClosed=20`),
-                fetch('/api/strategy-windows?limit=24&offset=0'),
+                fetch('/api/status', { cache: 'no-store' }),
+                fetch('/api/trades', { cache: 'no-store' }),
+                fetch(`/api/strategy-stats?window=${strategyWindow}&minClosed=20`, { cache: 'no-store' }),
+                fetch('/api/strategy-windows?limit=24&offset=0', { cache: 'no-store' }),
             ]);
 
             if (statusRes.ok) {
