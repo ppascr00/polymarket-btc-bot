@@ -6,6 +6,7 @@ import { ProbabilisticStrategy } from './probabilistic.js';
 import { EmaCrossoverStrategy } from './ema-crossover.js';
 import { RsiReversionStrategy } from './rsi-reversion.js';
 import { VolatilityBreakoutStrategy } from './volatility-breakout.js';
+import { AiAdaptiveStrategy } from './ai-adaptive.js';
 import type { Strategy } from '../types/index.js';
 
 const STRATEGIES: Record<string, () => Strategy> = {
@@ -13,6 +14,7 @@ const STRATEGIES: Record<string, () => Strategy> = {
     'ema-crossover': () => new EmaCrossoverStrategy(),
     'rsi-reversion': () => new RsiReversionStrategy(),
     'volatility-breakout': () => new VolatilityBreakoutStrategy(),
+    'ai-adaptive': () => new AiAdaptiveStrategy(),
 };
 
 /**

@@ -15,6 +15,10 @@ const STRATEGY_ENV_KEYS: Record<string, string[]> = {
         'VOLATILITY_BREAKOUT_MIN_EDGE_THRESHOLD',
         'VOL_BREAKOUT_MIN_EDGE_THRESHOLD',
     ],
+    'ai-adaptive': [
+        'AI_ADAPTIVE_MIN_EDGE_THRESHOLD',
+        'AI_MIN_EDGE_THRESHOLD',
+    ],
 };
 
 function parseNonNegativeNumber(raw: string | undefined): number | null {

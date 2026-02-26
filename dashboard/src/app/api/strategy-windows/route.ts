@@ -11,6 +11,7 @@ const AVAILABLE_STRATEGIES = [
     'ema-crossover',
     'rsi-reversion',
     'volatility-breakout',
+    'ai-adaptive',
 ];
 
 interface RawRow {

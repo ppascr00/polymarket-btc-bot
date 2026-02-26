@@ -8,6 +8,7 @@ const AVAILABLE_STRATEGIES = [
     'ema-crossover',
     'rsi-reversion',
     'volatility-breakout',
+    'ai-adaptive',
 ];
 
 function getDb(readonly = false) {

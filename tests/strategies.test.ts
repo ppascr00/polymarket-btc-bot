@@ -7,6 +7,7 @@ import { ProbabilisticStrategy } from '../src/strategy/probabilistic.js';
 import { EmaCrossoverStrategy } from '../src/strategy/ema-crossover.js';
 import { RsiReversionStrategy } from '../src/strategy/rsi-reversion.js';
 import { VolatilityBreakoutStrategy } from '../src/strategy/volatility-breakout.js';
+import { AiAdaptiveStrategy } from '../src/strategy/ai-adaptive.js';
 import { createStrategy, listStrategies } from '../src/strategy/registry.js';
 import type { FeatureSet, MarketState, Orderbook, PolymarketMarket } from '../src/types/index.js';
 
@@ -156,6 +157,7 @@ describe('Strategy Registry', () => {
         expect(names).toContain('ema-crossover');
         expect(names).toContain('rsi-reversion');
         expect(names).toContain('volatility-breakout');
+        expect(names).toContain('ai-adaptive');
     });
 
     it('creates strategies by name', () => {
@@ -170,6 +172,9 @@ describe('Strategy Registry', () => {
 
         const s4 = createStrategy('volatility-breakout');
         expect(s4.name).toBe('volatility-breakout');
+
+        const s5 = createStrategy('ai-adaptive');
+        expect(s5.name).toBe('ai-adaptive');
     });
 
     it('throws for unknown strategy', () => {
@@ -190,6 +195,24 @@ describe('Additional Strategies', () => {
             makeFeatures({ volatility: 0.004, rangeHL: 0.004, ret1m: 0.0015, ret5m: 0.002 }),
             makeMarketState()
         );
+        expect(['UP', 'DOWN', 'NO_TRADE']).toContain(signal.direction);
+    });
+
+    it('ai adaptive strategy can train and compute', () => {
+        const strat = new AiAdaptiveStrategy({ minEdge: 0.0, minConfidence: 0.0 });
+        const trainingData = Array.from({ length: 40 }, (_, i) => {
+            const isUp = i % 3 !== 0;
+            return makeFeatures({
+                windowStart: 1700000000000 + i * 300000,
+                open: 43000,
+                close: isUp ? 43120 : 42920,
+                ret1m: isUp ? 0.0012 : -0.0011,
+                ret5m: isUp ? 0.003 : -0.0028,
+            });
+        });
+        strat.train!(trainingData);
+        const signal = strat.compute(makeFeatures(), makeMarketState());
+        expect(signal.strategyName).toBe('ai-adaptive');
         expect(['UP', 'DOWN', 'NO_TRADE']).toContain(signal.direction);
     });
 });
