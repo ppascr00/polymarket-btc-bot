@@ -212,10 +212,13 @@ export default function DashboardPage() {
                 const prev = lastBtcPriceRef.current;
                 if (prev !== null) {
                     const diff = data.price - prev;
-                    setBtcDelta(diff);
-                    if (diff > 0) setBtcDirection('up');
-                    else if (diff < 0) setBtcDirection('down');
-                    else setBtcDirection('flat');
+                    if (diff > 0) {
+                        setBtcDelta(diff);
+                        setBtcDirection('up');
+                    } else if (diff < 0) {
+                        setBtcDelta(diff);
+                        setBtcDirection('down');
+                    }
                 } else {
                     setBtcDelta(0);
                     setBtcDirection('flat');
@@ -233,6 +236,12 @@ export default function DashboardPage() {
         const interval = setInterval(fetchBtcPrice, 1_000);
         return () => clearInterval(interval);
     }, [fetchBtcPrice]);
+
+    const formatBtcDelta = useCallback((value: number): string => {
+        const abs = Math.abs(value);
+        const decimals = abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
+        return `${value > 0 ? '+' : ''}${value.toFixed(decimals)}`;
+    }, []);
 
     const toggleBot = useCallback(async () => {
         if (!status || isTogglingBot || !status.processRunning) return;
@@ -464,7 +473,10 @@ export default function DashboardPage() {
                         {btcPrice?.price != null ? `$${btcPrice.price.toFixed(2)}` : '--'}
                     </div>
                     <div className="btc-ticker-meta">
-                        <span>{btcDelta > 0 ? '+' : ''}{btcDelta.toFixed(2)}</span>
+                        <span className={`btc-ticker-arrow arrow-${btcDirection}`}>
+                            {btcDirection === 'up' ? '▲' : btcDirection === 'down' ? '▼' : '•'}
+                        </span>
+                        <span>{formatBtcDelta(btcDelta)}</span>
                         <span>{btcPrice?.source ? ` · ${btcPrice.source}` : ''}</span>
                     </div>
                 </div>
@@ -598,7 +610,7 @@ export default function DashboardPage() {
                                             <tr key={trade.id}>
                                                 <td>{new Date(trade.timestamp).toLocaleTimeString()}</td>
                                                 <td>
-                                                    <span className={`badge ${trade.direction.toLowerCase()}`}>
+                                                    <span className={`badge dir-badge ${trade.direction.toLowerCase()}`}>
                                                         {trade.direction === 'UP' ? '▲' : '▼'} {trade.direction}
                                                     </span>
                                                 </td>

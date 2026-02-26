@@ -517,6 +517,15 @@ body {
   font-weight: 600;
 }
 
+.dir-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  white-space: nowrap;
+  min-width: 62px;
+}
+
 .badge.win {
   background: var(--accent-green-dim);
   color: var(--accent-green);
@@ -636,9 +645,24 @@ body {
 
 .btc-ticker-meta {
   display: flex;
+  align-items: center;
   gap: 8px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.btc-ticker-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.btc-ticker-arrow.arrow-flat {
+  opacity: 0.6;
 }
 
 .btc-ticker.btc-up {

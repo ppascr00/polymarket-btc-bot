@@ -99,7 +99,7 @@ export default function AllTradesPage() {
                                     <tr key={trade.id}>
                                         <td>{new Date(trade.timestamp).toLocaleString()}</td>
                                         <td>
-                                            <span className={`badge ${trade.direction.toLowerCase()}`}>
+                                            <span className={`badge dir-badge ${trade.direction.toLowerCase()}`}>
                                                 {trade.direction === 'UP' ? '▲' : '▼'} {trade.direction}
                                             </span>
                                         </td>

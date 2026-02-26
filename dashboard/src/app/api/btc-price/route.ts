@@ -8,6 +8,11 @@ import path from 'path';
 const DB_PATH = process.env.DB_PATH || path.resolve('..', 'data', 'bot.db');
 const BINANCE_REST_URL = process.env.BINANCE_REST_URL || 'https://api.binance.us';
 const BINANCE_SYMBOL = (process.env.BINANCE_SYMBOL || 'BTCUSDT').toUpperCase();
+const NO_CACHE_HEADERS = {
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+};
 
 function getDb() {
     try {
@@ -17,20 +22,26 @@ function getDb() {
     }
 }
 
-async function getPriceFromBinance() {
-    const url = `${BINANCE_REST_URL}/api/v3/ticker/price?symbol=${BINANCE_SYMBOL}`;
+async function getPriceFromBinanceBookTicker() {
+    const url = `${BINANCE_REST_URL}/api/v3/ticker/bookTicker?symbol=${BINANCE_SYMBOL}`;
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
-        throw new Error(`Binance REST error: ${response.status}`);
+        throw new Error(`Binance bookTicker error: ${response.status}`);
     }
 
-    const body = await response.json() as { price?: string };
-    const price = Number(body.price);
-    if (!Number.isFinite(price)) {
-        throw new Error('Invalid Binance price payload');
-    }
+    const body = await response.json() as { bidPrice?: string; askPrice?: string; price?: string };
+    const bid = Number(body.bidPrice);
+    const ask = Number(body.askPrice);
+    const direct = Number(body.price);
 
-    return price;
+    // Prefer bid/ask midpoint for fresher movement.
+    if (Number.isFinite(bid) && Number.isFinite(ask) && bid > 0 && ask > 0) {
+        return (bid + ask) / 2;
+    }
+    if (Number.isFinite(direct) && direct > 0) {
+        return direct;
+    }
+    throw new Error('Invalid Binance bookTicker payload');
 }
 
 function getPriceFromDbFallback() {
@@ -55,22 +66,28 @@ function getPriceFromDbFallback() {
 
 export async function GET() {
     try {
-        const price = await getPriceFromBinance();
-        return NextResponse.json({
-            symbol: BINANCE_SYMBOL,
-            price,
-            timestamp: Date.now(),
-            source: 'binance-rest',
-        });
+        const price = await getPriceFromBinanceBookTicker();
+        return NextResponse.json(
+            {
+                symbol: BINANCE_SYMBOL,
+                price,
+                timestamp: Date.now(),
+                source: 'binance-bookTicker',
+            },
+            { headers: NO_CACHE_HEADERS }
+        );
     } catch {
         const fallback = getPriceFromDbFallback();
         if (fallback) {
-            return NextResponse.json({
-                symbol: BINANCE_SYMBOL,
-                price: fallback.price,
-                timestamp: fallback.timestamp,
-                source: 'db-fallback',
-            });
+            return NextResponse.json(
+                {
+                    symbol: BINANCE_SYMBOL,
+                    price: fallback.price,
+                    timestamp: fallback.timestamp,
+                    source: 'db-fallback',
+                },
+                { headers: NO_CACHE_HEADERS }
+            );
         }
 
         return NextResponse.json(
@@ -80,8 +97,7 @@ export async function GET() {
                 timestamp: Date.now(),
                 source: 'unavailable',
             },
-            { status: 503 }
+            { status: 503, headers: NO_CACHE_HEADERS }
         );
     }
 }
-
