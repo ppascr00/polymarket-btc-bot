@@ -39,6 +39,7 @@ const STRATEGY_LABELS: Record<string, string> = {
     'ema-crossover': 'EMA Crossover',
     'rsi-reversion': 'RSI Reversion',
     'volatility-breakout': 'Volatility Breakout',
+    'ai-adaptive': 'AI Adaptive',
 };
 
 const PAGE_SIZE = 100;
@@ -80,12 +81,13 @@ export default function StrategyWindowsPage() {
         () => Math.max(1, Math.ceil(totalWindows / PAGE_SIZE)),
         [totalWindows]
     );
+    const paperMultiLabel = `PAPER x${Math.max(1, strategies.length)}`;
 
     return (
         <div className="dashboard">
             <header className="dashboard-header">
                 <div>
-                    <h1 className="dashboard-title">Window Matrix (PAPER x4)</h1>
+                    <h1 className="dashboard-title">Window Matrix ({paperMultiLabel})</h1>
                     <p className="dashboard-subtitle">
                         Full history by 5-minute window ({totalWindows} windows)
                     </p>

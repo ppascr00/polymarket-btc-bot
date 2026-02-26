@@ -60,6 +60,11 @@ export class Scheduler {
     private paperMultiEnabled = false;
     private paperStrategies: Map<string, Strategy> = new Map();
     private readonly paperStrategyInitialBalance = 100;
+    private lastSingleRetrainAtMs = 0;
+    private lastSingleRetrainFeatureCount = 0;
+    private lastPaperMultiRetrainAtMs = 0;
+    private lastPaperMultiRetrainFeatureCount = 0;
+    private readonly retrainMinNewFeatures = 24;
 
     constructor(
         config: BotConfig,
@@ -80,6 +85,7 @@ export class Scheduler {
         this.featureEngine = new FeatureEngine();
         this.aggregator = new OHLCVAggregator(config.timing.windowMinutes);
         this.lastStrategyName = strategy.name;
+        this.lastSingleRetrainFeatureCount = this.repo.getAllFeatures().length;
     }
 
     async start(): Promise<void> {
@@ -229,6 +235,7 @@ export class Scheduler {
 
         // Save features
         this.repo.insertFeatures(features);
+        this.maybeRetrainActiveStrategy();
 
         // Get market state
         let marketState: MarketState;
@@ -399,6 +406,7 @@ export class Scheduler {
         marketState: MarketState
     ): Promise<void> {
         this.ensurePaperStrategiesLoaded();
+        this.maybeRetrainPaperStrategies();
 
         const strategyNames = Array.from(this.paperStrategies.keys());
         const focusStrategyName = this.repo.getState('strategy_active') || this.lastStrategyName;
@@ -537,6 +545,101 @@ export class Scheduler {
             { strategies: Array.from(this.paperStrategies.keys()) },
             'Paper multi strategies loaded'
         );
+        this.lastPaperMultiRetrainAtMs = Date.now();
+        this.lastPaperMultiRetrainFeatureCount = historicalFeatures.length;
+    }
+
+    private getRetrainIntervalMs(): number {
+        return this.config.tradingMode === 'PAPER'
+            ? 15 * 60 * 1000
+            : 60 * 60 * 1000;
+    }
+
+    private maybeRetrainActiveStrategy(): void {
+        if (!this.strategy.train) return;
+
+        const now = Date.now();
+        const intervalMs = this.getRetrainIntervalMs();
+        if (
+            this.lastSingleRetrainAtMs > 0 &&
+            now - this.lastSingleRetrainAtMs < intervalMs
+        ) {
+            return;
+        }
+
+        const historicalFeatures = this.repo.getAllFeatures();
+        const featureCount = historicalFeatures.length;
+        const newFeatures = featureCount - this.lastSingleRetrainFeatureCount;
+        if (
+            this.lastSingleRetrainAtMs > 0 &&
+            newFeatures < this.retrainMinNewFeatures
+        ) {
+            return;
+        }
+
+        if (featureCount < 25) return;
+
+        this.strategy.train(historicalFeatures);
+        this.lastSingleRetrainAtMs = now;
+        this.lastSingleRetrainFeatureCount = featureCount;
+        logger.info(
+            {
+                strategy: this.strategy.name,
+                mode: this.config.tradingMode,
+                featureCount,
+                newFeatures,
+                retrainIntervalMinutes: Math.round(intervalMs / 60_000),
+            },
+            'Strategy retrained (scheduled)'
+        );
+    }
+
+    private maybeRetrainPaperStrategies(): void {
+        if (this.paperStrategies.size === 0) return;
+
+        const now = Date.now();
+        const intervalMs = this.getRetrainIntervalMs();
+        if (
+            this.lastPaperMultiRetrainAtMs > 0 &&
+            now - this.lastPaperMultiRetrainAtMs < intervalMs
+        ) {
+            return;
+        }
+
+        const historicalFeatures = this.repo.getAllFeatures();
+        const featureCount = historicalFeatures.length;
+        const newFeatures = featureCount - this.lastPaperMultiRetrainFeatureCount;
+        if (
+            this.lastPaperMultiRetrainAtMs > 0 &&
+            newFeatures < this.retrainMinNewFeatures
+        ) {
+            return;
+        }
+
+        if (featureCount < 25) return;
+
+        let retrainedCount = 0;
+        for (const [strategyName, strategy] of this.paperStrategies.entries()) {
+            if (!strategy.train) continue;
+            strategy.train(historicalFeatures);
+            retrainedCount++;
+            logger.info({ strategy: strategyName, featureCount }, 'Paper multi strategy retrained');
+        }
+
+        if (retrainedCount > 0) {
+            this.lastPaperMultiRetrainAtMs = now;
+            this.lastPaperMultiRetrainFeatureCount = featureCount;
+            logger.info(
+                {
+                    mode: this.config.tradingMode,
+                    retrainedCount,
+                    featureCount,
+                    newFeatures,
+                    retrainIntervalMinutes: Math.round(intervalMs / 60_000),
+                },
+                'Paper multi retraining cycle completed'
+            );
+        }
     }
 
     private getStakeByConfidence(baseStake: number, confidence: number): number {
@@ -636,6 +739,8 @@ export class Scheduler {
         const historicalFeatures = this.repo.getAllFeatures();
         if (historicalFeatures.length > 20 && nextStrategy.train) {
             nextStrategy.train(historicalFeatures);
+            this.lastSingleRetrainAtMs = Date.now();
+            this.lastSingleRetrainFeatureCount = historicalFeatures.length;
         }
 
         this.strategy = nextStrategy;

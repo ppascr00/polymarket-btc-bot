@@ -11,6 +11,7 @@ const AVAILABLE_STRATEGIES = [
     'ema-crossover',
     'rsi-reversion',
     'volatility-breakout',
+    'ai-adaptive',
 ];
 
 type WindowKey = 'today' | '24h' | '7d' | '30d' | 'all';

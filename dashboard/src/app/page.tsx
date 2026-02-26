@@ -8,6 +8,7 @@ const STRATEGY_LABELS: Record<string, string> = {
     'ema-crossover': 'EMA Crossover',
     'rsi-reversion': 'RSI Reversion',
     'volatility-breakout': 'Volatility Breakout',
+    'ai-adaptive': 'AI Adaptive',
 };
 
 type StrategyWindow = 'today' | '24h' | '7d' | '30d' | 'all';
@@ -356,7 +357,7 @@ export default function DashboardPage() {
             }
             await fetchData();
         } catch {
-            setError('Failed to update PAPER x4 mode');
+            setError('Failed to update PAPER multi mode');
         } finally {
             setIsUpdatingPaperMulti(false);
         }
@@ -365,6 +366,7 @@ export default function DashboardPage() {
     const mode = status?.mode ?? 'PAPER';
     const signal = status?.lastSignal;
     const comparisonStrategies = status?.availableStrategies ?? Object.keys(STRATEGY_LABELS);
+    const paperMultiLabel = `PAPER x${comparisonStrategies.length}`;
 
     return (
         <div className="dashboard">
@@ -398,11 +400,11 @@ export default function DashboardPage() {
                             disabled={!status || mode !== 'PAPER' || isUpdatingPaperMulti}
                             onClick={() => updatePaperMulti(!(status?.paperMultiEnabled ?? false))}
                         >
-                            {isUpdatingPaperMulti
-                                ? 'Updating...'
-                                : status?.paperMultiEnabled
-                                    ? 'PAPER x4 ON'
-                                    : 'PAPER x4 OFF'}
+                                {isUpdatingPaperMulti
+                                    ? 'Updating...'
+                                    : status?.paperMultiEnabled
+                                        ? `${paperMultiLabel} ON`
+                                        : `${paperMultiLabel} OFF`}
                         </button>
                     </div>
                     <div className="mode-toggle">
@@ -468,7 +470,7 @@ export default function DashboardPage() {
             {/* Refresh Bar */}
             <div className="refresh-bar">
                 <div className={`btc-ticker btc-${btcDirection}`}>
-                    <div className="btc-ticker-label">BTC/USDT</div>
+                    <div className="btc-ticker-label">{btcPrice?.symbol || 'BTC/USD'}</div>
                     <div className="btc-ticker-price">
                         {btcPrice?.price != null ? `$${btcPrice.price.toFixed(2)}` : '--'}
                     </div>
@@ -523,7 +525,7 @@ export default function DashboardPage() {
                         {status?.accountBalanceSource === 'paper-simulated'
                             ? 'Simulated in PAPER mode'
                             : status?.accountBalanceSource === 'paper-simulated-multi'
-                                ? 'Aggregated across 4 PAPER strategy wallets'
+                                ? `Aggregated across ${paperMultiLabel} strategy wallets`
                                 : status?.accountBalanceSource === 'live-polymarket'
                                     ? 'Real balance from Polymarket'
                                     : 'Live balance unavailable'}
@@ -538,7 +540,7 @@ export default function DashboardPage() {
                 <div className="card">
                     <div className="card-title">Strategy</div>
                     <div className="card-value neutral" style={{ fontSize: 20 }}>
-                        {status?.paperMultiEnabled ? 'paper-multi (x4)' : (status?.strategy ?? '-')}
+                        {status?.paperMultiEnabled ? `paper-multi (${paperMultiLabel})` : (status?.strategy ?? '-')}
                     </div>
                     <div className="card-detail">
                         {status?.paperMultiEnabled
@@ -828,7 +830,7 @@ export default function DashboardPage() {
             <div className="card" style={{ marginBottom: 24 }}>
                 <div className="strategy-compare-header">
                     <div className="card-title" style={{ marginBottom: 0 }}>
-                        Window Matrix (PAPER x4)
+                        Window Matrix ({paperMultiLabel})
                     </div>
                     <Link className="view-all-link" href="/strategy-windows">
                         View full table

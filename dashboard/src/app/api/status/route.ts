@@ -13,6 +13,7 @@ const AVAILABLE_STRATEGIES = [
     'ema-crossover',
     'rsi-reversion',
     'volatility-breakout',
+    'ai-adaptive',
 ];
 const AVAILABLE_MODES = ['PAPER', 'LIVE'];
 
