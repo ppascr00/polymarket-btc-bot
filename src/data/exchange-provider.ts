@@ -28,9 +28,23 @@ export class BinanceProvider implements ExchangeDataProvider {
         this.restUrl = config.binance.restUrl;
     }
 
+    private buildStreamUrl(): string {
+        const base = this.wsUrl.replace(/\/+$/, '');
+
+        // If user already configured a full stream URL, honor it.
+        if (base.includes('@') || base.includes('/stream?streams=')) {
+            return base;
+        }
+
+        const host = base.replace(/\/ws\/?$/, '');
+        // Combined stream: keep 1m klines for candle persistence and add aggTrade
+        // for low-latency heartbeat so stale checks are less sensitive to gaps.
+        return `${host}/stream?streams=${this.symbol}@aggTrade/${this.symbol}@kline_1m`;
+    }
+
     async connect(): Promise<void> {
         return new Promise((resolve, reject) => {
-            const streamUrl = `${this.wsUrl}/${this.symbol}@kline_1m`;
+            const streamUrl = this.buildStreamUrl();
 
             logger.info({ url: streamUrl }, 'Connecting to Binance WebSocket');
 
@@ -47,8 +61,10 @@ export class BinanceProvider implements ExchangeDataProvider {
             this.ws.on('message', (data: Buffer) => {
                 this.lastMessageTime = Date.now();
                 try {
-                    const msg = JSON.parse(data.toString());
-                    if (msg.e === 'kline') {
+                    const raw = JSON.parse(data.toString());
+                    const msg = raw?.data && raw?.stream ? raw.data : raw;
+
+                    if (msg?.e === 'kline') {
                         const k = msg.k;
                         // Only emit completed candles
                         if (k.x) {
@@ -69,6 +85,12 @@ export class BinanceProvider implements ExchangeDataProvider {
                                 'Candle received'
                             );
                         }
+                    } else if (msg?.e === 'aggTrade') {
+                        // Low-latency stream used to keep heartbeat fresh.
+                        logger.debug(
+                            { ts: msg.T, price: parseFloat(msg.p) },
+                            'AggTrade received'
+                        );
                     }
                 } catch (err) {
                     logger.error({ err }, 'Error parsing Binance message');

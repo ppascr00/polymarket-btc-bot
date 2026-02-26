@@ -127,6 +127,13 @@ interface StrategyWindowRow {
     strategies: Record<string, StrategyWindowAction | null>;
 }
 
+interface BtcPriceData {
+    symbol: string;
+    price: number | null;
+    timestamp: number;
+    source: string;
+}
+
 export default function DashboardPage() {
     const [status, setStatus] = useState<StatusData | null>(null);
     const [trades, setTrades] = useState<Trade[]>([]);
@@ -142,6 +149,7 @@ export default function DashboardPage() {
     const [isUpdatingStrategy, setIsUpdatingStrategy] = useState(false);
     const [isUpdatingMode, setIsUpdatingMode] = useState(false);
     const [isUpdatingPaperMulti, setIsUpdatingPaperMulti] = useState(false);
+    const [btcPrice, setBtcPrice] = useState<BtcPriceData | null>(null);
 
     const fetchData = useCallback(async () => {
         try {
@@ -191,6 +199,23 @@ export default function DashboardPage() {
         const interval = setInterval(fetchData, 10_000);
         return () => clearInterval(interval);
     }, [fetchData]);
+
+    const fetchBtcPrice = useCallback(async () => {
+        try {
+            const res = await fetch('/api/btc-price', { cache: 'no-store' });
+            if (!res.ok) return;
+            const data = await res.json() as BtcPriceData;
+            setBtcPrice(data);
+        } catch {
+            // Keep last known value.
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchBtcPrice();
+        const interval = setInterval(fetchBtcPrice, 1_000);
+        return () => clearInterval(interval);
+    }, [fetchBtcPrice]);
 
     const toggleBot = useCallback(async () => {
         if (!status || isTogglingBot || !status.processRunning) return;
@@ -416,6 +441,10 @@ export default function DashboardPage() {
 
             {/* Refresh Bar */}
             <div className="refresh-bar">
+                <span className="last-update">
+                    BTC: {btcPrice?.price != null ? `$${btcPrice.price.toFixed(2)}` : '--'}
+                    {btcPrice?.source ? ` (${btcPrice.source})` : ''}
+                </span>
                 <span className="last-update">Last update: {lastUpdate || '—'}</span>
                 <button className="refresh-btn" onClick={fetchData}>⟳ Refresh</button>
             </div>
