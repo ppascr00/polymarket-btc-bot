@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
 const STRATEGY_LABELS: Record<string, string> = {
@@ -150,6 +150,9 @@ export default function DashboardPage() {
     const [isUpdatingMode, setIsUpdatingMode] = useState(false);
     const [isUpdatingPaperMulti, setIsUpdatingPaperMulti] = useState(false);
     const [btcPrice, setBtcPrice] = useState<BtcPriceData | null>(null);
+    const [btcDelta, setBtcDelta] = useState<number>(0);
+    const [btcDirection, setBtcDirection] = useState<'up' | 'down' | 'flat'>('flat');
+    const lastBtcPriceRef = useRef<number | null>(null);
 
     const fetchData = useCallback(async () => {
         try {
@@ -205,6 +208,20 @@ export default function DashboardPage() {
             const res = await fetch('/api/btc-price', { cache: 'no-store' });
             if (!res.ok) return;
             const data = await res.json() as BtcPriceData;
+            if (typeof data.price === 'number' && Number.isFinite(data.price)) {
+                const prev = lastBtcPriceRef.current;
+                if (prev !== null) {
+                    const diff = data.price - prev;
+                    setBtcDelta(diff);
+                    if (diff > 0) setBtcDirection('up');
+                    else if (diff < 0) setBtcDirection('down');
+                    else setBtcDirection('flat');
+                } else {
+                    setBtcDelta(0);
+                    setBtcDirection('flat');
+                }
+                lastBtcPriceRef.current = data.price;
+            }
             setBtcPrice(data);
         } catch {
             // Keep last known value.
@@ -441,10 +458,16 @@ export default function DashboardPage() {
 
             {/* Refresh Bar */}
             <div className="refresh-bar">
-                <span className="last-update">
-                    BTC: {btcPrice?.price != null ? `$${btcPrice.price.toFixed(2)}` : '--'}
-                    {btcPrice?.source ? ` (${btcPrice.source})` : ''}
-                </span>
+                <div className={`btc-ticker btc-${btcDirection}`}>
+                    <div className="btc-ticker-label">BTC/USDT</div>
+                    <div className="btc-ticker-price">
+                        {btcPrice?.price != null ? `$${btcPrice.price.toFixed(2)}` : '--'}
+                    </div>
+                    <div className="btc-ticker-meta">
+                        <span>{btcDelta > 0 ? '+' : ''}{btcDelta.toFixed(2)}</span>
+                        <span>{btcPrice?.source ? ` · ${btcPrice.source}` : ''}</span>
+                    </div>
+                </div>
                 <span className="last-update">Last update: {lastUpdate || '—'}</span>
                 <button className="refresh-btn" onClick={fetchData}>⟳ Refresh</button>
             </div>

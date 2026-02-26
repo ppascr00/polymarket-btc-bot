@@ -609,6 +609,58 @@ body {
   margin-bottom: 16px;
 }
 
+.btc-ticker {
+  min-width: 240px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  display: grid;
+  gap: 2px;
+}
+
+.btc-ticker-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.btc-ticker-price {
+  font-size: 26px;
+  line-height: 1.05;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.btc-ticker-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.btc-ticker.btc-up {
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.12);
+}
+
+.btc-ticker.btc-up .btc-ticker-price,
+.btc-ticker.btc-up .btc-ticker-meta {
+  color: var(--accent-green);
+}
+
+.btc-ticker.btc-down {
+  border-color: rgba(239, 68, 68, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.12);
+}
+
+.btc-ticker.btc-down .btc-ticker-price,
+.btc-ticker.btc-down .btc-ticker-meta {
+  color: var(--accent-red);
+}
+
 .refresh-btn {
   background: var(--bg-card);
   color: var(--text-secondary);
@@ -650,4 +702,14 @@ body {
 @media (max-width: 600px) {
   .grid-top { grid-template-columns: 1fr; }
   .dashboard { padding: 16px; }
+  .refresh-bar {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .btc-ticker {
+    min-width: 100%;
+  }
+  .btc-ticker-price {
+    font-size: 22px;
+  }
 }
