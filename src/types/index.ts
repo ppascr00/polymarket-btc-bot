@@ -270,6 +270,13 @@ export interface ExchangeDataProvider {
     ): Promise<Candle[]>;
     isConnected(): boolean;
     getLatency(): number;
+    getPriceNear?(
+        timestamp: number,
+        options?: {
+            direction?: 'before' | 'after' | 'nearest';
+            maxDiffMs?: number;
+        }
+    ): number | null;
 }
 
 export interface PolymarketClient {
