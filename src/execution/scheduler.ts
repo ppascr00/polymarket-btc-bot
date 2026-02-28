@@ -303,7 +303,13 @@ export class Scheduler {
             '✅ Executing trade'
         );
 
-        const trade = await this.executionEngine.execute(signal, marketState, stake, features.close);
+        const btcEntryForWindow = this.getBtcEntryForWindow(windowStart, features.close);
+        const trade = await this.executionEngine.execute(
+            signal,
+            marketState,
+            stake,
+            btcEntryForWindow
+        );
         trade.windowStart = windowStart;
 
         // Save trade
@@ -326,7 +332,26 @@ export class Scheduler {
     }
 
     private async resolvePendingTrades(previousWindowStart: number): Promise<void> {
-        const pendingTrades = this.repo.getPendingTrades();
+        const maxPendingAgeMs = Number(
+            process.env.PENDING_RESOLUTION_MAX_AGE_MS ?? String(24 * 60 * 60 * 1000)
+        );
+        const now = Date.now();
+        const pendingCutoff = now - (Number.isFinite(maxPendingAgeMs) ? maxPendingAgeMs : 24 * 60 * 60 * 1000);
+        const allPendingTrades = this.repo.getPendingTrades();
+        const pendingTrades = allPendingTrades.filter((t) => t.timestamp >= pendingCutoff);
+        const skippedOldPending = allPendingTrades.length - pendingTrades.length;
+
+        if (skippedOldPending > 0) {
+            logger.info(
+                {
+                    skippedOldPending,
+                    pendingResolutionMaxAgeMs: Number.isFinite(maxPendingAgeMs)
+                        ? maxPendingAgeMs
+                        : 24 * 60 * 60 * 1000,
+                },
+                'Skipping stale pending trades from old windows'
+            );
+        }
 
         for (const trade of pendingTrades) {
             // Resolve trades as soon as their 5m window has just finished.
@@ -335,13 +360,13 @@ export class Scheduler {
 
             // Get the candle data after the window to determine outcome
             const windowEnd = trade.windowStart + this.config.timing.windowMinutes * 60 * 1000;
-            const nextCandles = this.repo.getCandles(trade.windowStart, windowEnd);
+            const boundaryPrices = this.getWindowBoundaryPrices(trade.windowStart, windowEnd);
 
-            if (nextCandles.length < 2) continue; // not enough data yet
+            if (!boundaryPrices) continue; // wait until we have true window boundaries
 
-            const firstCandle = nextCandles[0]!;
-            const lastCandle = nextCandles[nextCandles.length - 1]!;
-            const priceWentUp = lastCandle.close > firstCandle.open;
+            const btcPriceEntry = boundaryPrices.entry;
+            const btcPriceClose = boundaryPrices.close;
+            const priceWentUp = btcPriceClose > btcPriceEntry;
 
             const isCorrect =
                 (trade.direction === 'UP' && priceWentUp) ||
@@ -354,10 +379,21 @@ export class Scheduler {
                 : -trade.stake;
 
             if (trade.id !== undefined) {
-                const btcPriceClose = lastCandle.close;
-                this.repo.updateTradeOutcome(trade.id, outcome, pnl, btcPriceClose);
+                this.repo.updateTradeOutcome(
+                    trade.id,
+                    outcome,
+                    pnl,
+                    btcPriceClose,
+                    btcPriceEntry
+                );
                 if (!this.paperMultiEnabled) {
-                    this.riskManager.recordTrade({ ...trade, outcome, pnl, btcPriceClose });
+                    this.riskManager.recordTrade({
+                        ...trade,
+                        outcome,
+                        pnl,
+                        btcPriceEntry,
+                        btcPriceClose,
+                    });
                 }
 
                 logger.info(
@@ -367,7 +403,7 @@ export class Scheduler {
                         pnl: pnl.toFixed(2),
                         direction: trade.direction,
                         priceWentUp,
-                        btcPriceEntry: trade.btcPriceEntry,
+                        btcPriceEntry,
                         btcPriceClose,
                     },
                     outcome === 'WIN' ? '🟢 Trade resolved: WIN' : '🔴 Trade resolved: LOSS'
@@ -413,6 +449,8 @@ export class Scheduler {
         let firstSignal: Signal | null = null;
         let focusedSignal: Signal | null = null;
 
+        const btcEntryForWindow = this.getBtcEntryForWindow(windowStart, features.close);
+
         for (const strategyName of strategyNames) {
             const strategy = this.paperStrategies.get(strategyName);
             if (!strategy) continue;
@@ -441,7 +479,8 @@ export class Scheduler {
                     decisionReason = `Edge ${(signal.edge * 100).toFixed(1)}% < threshold ${(effectiveMinEdge * 100).toFixed(1)}%`;
                 } else {
                     const closedPnl = this.repo.getClosedPnlByModeAndStrategy('PAPER', strategyName);
-                    const virtualBalance = this.paperStrategyInitialBalance + closedPnl;
+                    const topUp = this.getPaperTopUpForStrategy(strategyName);
+                    const virtualBalance = this.paperStrategyInitialBalance + closedPnl + topUp;
                     stake = this.getStakeByConfidence(
                         this.config.risk.maxStakePerTrade,
                         signal.confidence
@@ -466,7 +505,7 @@ export class Scheduler {
                     signal,
                     marketState,
                     stake,
-                    features.close
+                    btcEntryForWindow
                 );
                 trade.windowStart = windowStart;
                 tradeId = this.repo.insertTrade(trade);
@@ -642,6 +681,14 @@ export class Scheduler {
         }
     }
 
+    private getPaperTopUpForStrategy(strategyName: string): number {
+        const key = `paper_topup_${strategyName}`;
+        const raw = this.repo.getState(key);
+        if (!raw) return 0;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
     private getStakeByConfidence(baseStake: number, confidence: number): number {
         let stake = baseStake;
         if (confidence < 0.3) {
@@ -650,6 +697,100 @@ export class Scheduler {
             stake *= 0.75;
         }
         return stake;
+    }
+
+    private getBtcEntryForWindow(windowStart: number, fallback: number): number {
+        const precise = this.getBoundaryPriceFromFeed(windowStart);
+        if (precise !== null) {
+            return precise;
+        }
+
+        const windowEnd = windowStart + this.config.timing.windowMinutes * 60 * 1000;
+        const candles = this.repo.getCandles(windowStart, windowEnd);
+        if (candles.length === 0) {
+            return fallback;
+        }
+
+        const firstAligned = candles.find((c) => c.timestamp === windowStart);
+        return (firstAligned ?? candles[0]!).open;
+    }
+
+    private getWindowBoundaryPrices(
+        windowStart: number,
+        windowEnd: number
+    ): { entry: number; close: number } | null {
+        const preciseEntry = this.getBoundaryPriceFromFeed(windowStart);
+        const preciseClose = this.getBoundaryPriceFromFeed(windowEnd);
+        if (preciseEntry !== null && preciseClose !== null) {
+            return {
+                entry: preciseEntry,
+                close: preciseClose,
+            };
+        }
+
+        const candles = this.repo.getCandles(windowStart, windowEnd);
+        if (candles.length === 0) return null;
+
+        const expectedLastTs = windowEnd - 60_000;
+        const firstAligned = candles.find((c) => c.timestamp === windowStart);
+        const lastAligned = candles.find((c) => c.timestamp === expectedLastTs);
+        const firstCandle = candles[0];
+        const lastCandle = candles[candles.length - 1];
+
+        if (!firstAligned || !lastAligned) {
+            logger.warn(
+                {
+                    windowStart: formatUTC(windowStart),
+                    windowEnd: formatUTC(windowEnd),
+                    expectedLastTs: formatUTC(expectedLastTs),
+                    availableFirstTs: firstCandle?.timestamp
+                        ? formatUTC(firstCandle.timestamp)
+                        : null,
+                    availableLastTs: lastCandle?.timestamp
+                        ? formatUTC(lastCandle.timestamp)
+                        : null,
+                    candleCount: candles.length,
+                },
+                'Missing boundary candles for exact window pricing. Deferring resolution.'
+            );
+            return null;
+        }
+
+        return {
+            entry: firstAligned.open,
+            close: lastAligned.close,
+        };
+    }
+
+    private getBoundaryPriceFromFeed(targetTs: number): number | null {
+        if (!this.exchange.getPriceNear) return null;
+
+        const maxDiffMs = Number(process.env.BOUNDARY_PRICE_MAX_DIFF_MS ?? '120000');
+        const preferredDirection =
+            (process.env.BOUNDARY_PRICE_DIRECTION as 'before' | 'after' | 'nearest' | undefined) ??
+            'nearest';
+
+        let price = this.exchange.getPriceNear(targetTs, {
+            direction: preferredDirection,
+            maxDiffMs: Number.isFinite(maxDiffMs) ? maxDiffMs : 120_000,
+        });
+
+        // Fallback path: if strict direction has no tick nearby, use nearest.
+        if (price === null && preferredDirection !== 'nearest') {
+            price = this.exchange.getPriceNear(targetTs, {
+                direction: 'nearest',
+                maxDiffMs: Number.isFinite(maxDiffMs) ? maxDiffMs * 2 : 120_000,
+            });
+        }
+
+        if (price === null) {
+            logger.debug(
+                { targetTs: formatUTC(targetTs), maxDiffMs, preferredDirection },
+                'No precise boundary tick available from exchange provider'
+            );
+        }
+
+        return price;
     }
 
     private async waitForNextWindow(): Promise<void> {

@@ -159,16 +159,39 @@ export class Repository {
         return result.lastInsertRowid as number;
     }
 
-    updateTradeOutcome(id: number, outcome: TradeOutcome, pnl: number, btcPriceClose?: number): void {
+    updateTradeOutcome(
+        id: number,
+        outcome: TradeOutcome,
+        pnl: number,
+        btcPriceClose?: number,
+        btcPriceEntry?: number
+    ): void {
+        if (btcPriceClose !== undefined && btcPriceEntry !== undefined) {
+            this.db
+                .prepare(
+                    'UPDATE trades SET outcome = ?, pnl = ?, btc_price_close = ?, btc_price_entry = ? WHERE id = ?'
+                )
+                .run(outcome, pnl, btcPriceClose, btcPriceEntry, id);
+            return;
+        }
+
         if (btcPriceClose !== undefined) {
             this.db
                 .prepare('UPDATE trades SET outcome = ?, pnl = ?, btc_price_close = ? WHERE id = ?')
                 .run(outcome, pnl, btcPriceClose, id);
-        } else {
-            this.db
-                .prepare('UPDATE trades SET outcome = ?, pnl = ? WHERE id = ?')
-                .run(outcome, pnl, id);
+            return;
         }
+
+        if (btcPriceEntry !== undefined) {
+            this.db
+                .prepare('UPDATE trades SET outcome = ?, pnl = ?, btc_price_entry = ? WHERE id = ?')
+                .run(outcome, pnl, btcPriceEntry, id);
+            return;
+        }
+
+        this.db
+            .prepare('UPDATE trades SET outcome = ?, pnl = ? WHERE id = ?')
+            .run(outcome, pnl, id);
     }
 
     getRecentTrades(limit: number = 50): TradeRecord[] {

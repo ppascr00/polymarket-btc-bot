@@ -10,7 +10,7 @@ import { createLogger } from './utils/logger.js';
 import { loadConfig } from './config/index.js';
 import { initializeDatabase } from './db/schema.js';
 import { Repository } from './db/repository.js';
-import { BinanceProvider } from './data/exchange-provider.js';
+import { PolymarketReferenceProvider } from './data/polymarket-reference-provider.js';
 import { PolymarketCLOBClient } from './polymarket/client.js';
 import { PolymarketMockClient } from './polymarket/client-mock.js';
 import { createStrategy } from './strategy/registry.js';
@@ -46,13 +46,16 @@ async function main() {
     logger.info('Database initialized');
 
     // ─── Initialize Exchange Provider ─────────────
-    const exchange = new BinanceProvider(config);
-    try {
-        await exchange.connect();
-        logger.info('✅ Binance WebSocket connected');
-    } catch (err) {
-        logger.error({ err }, 'Failed to connect to Binance WebSocket');
-        logger.info('Will retry with REST fallback...');
+    // Use Polymarket reference feed for BTC price (not Binance),
+    // so entry/close align with Polymarket market reference.
+    const exchange = new PolymarketReferenceProvider(config);
+    await exchange.connect();
+    if (exchange.isConnected()) {
+        logger.info('✅ Polymarket reference feed connected');
+    } else {
+        logger.warn(
+            'Polymarket reference feed started without initial tick. Waiting for first update.'
+        );
     }
 
     // ─── Initialize Polymarket Client ─────────────
